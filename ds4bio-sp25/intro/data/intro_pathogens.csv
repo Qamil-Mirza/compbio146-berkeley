@@ -1,0 +1,33 @@
+Scientific name,Description,Subgroup,Size,Genes,Proteins
+Yersina pestis,Plague,Bacteria,4.93,4773,4390
+Mycobacterium tuberculosis,Tuberculosis,Bacteria,4.41,4300,4128
+Escherichia coli,E. coli,Bacteria,5.1,5084,4721
+Helicobacter pylori,H. pylori,Bacteria,1.6,1587,1545
+Bacillus anthracis,Anthrax,Bacteria,5.49,5804,5299
+Clostridium tetani,Tetanus,Bacteria,2.81,2740,2624
+Bordetella pertussis,Whooping cough,Bacteria,4.1,3987,3574
+Staphylococcus aureus,Staph infection,Bacteria,2.98,3115,2944
+Streptococcus pyogenes,Strep throat,Bacteria,1.91,2008,1860
+Vibrio cholerae,Cholera,Bacteria,4.36,4099,3808
+Variola major,Smallpox,Virus,0.19,206,206
+HIV,HIV,Virus,0.0088,10,10
+Sudan ebolavirus,Ebola,Virus,0.019,9,9
+Measles morbillivirus,Measles,Virus,0.016,8,8
+Influenza A,Flu,Virus,0.013,11,11
+West Nile Virus,West Nile Virus,Virus,0.011,3,3
+Zika Virus,Zika,Virus,0.011,3,3
+Dengue virus,Dengue fever,Virus,0.011,10,10
+Ancylostoma duodenale,Old World hookworm,Parasite,332.88,27483,27483
+Necator americanus,New World hookworm,Parasite,244.08,19153,19153
+Toxoplasma gondii,Toxoplasmosis,Parasite,65.67,8505,8318
+Girardia tigrina,Girardia,Parasite,1428.15,22000,22000
+Trypanosoma cruzi,Chagas disease,Parasite,105,22570,22570
+Plasmodium vivax,Malaria (mild),Parasite,39.65,6829,6510
+Plasmodium falciparum,Malaria (severe),Parasite,23.33,5670,5392
+Stachybotrys chartarum,Black mold,Fungus,36.01,11370,11368
+Pneumocystis jirovecii,Pneumonia,Fungus,8.18,3754,3537
+Histoplasma capsulatum,Histoplasmosis,Fungus,38.96,9792,9547
+Cryptococcus neoformans,Meningitis,Fungus,18.79,6914,6914
+Aspergillus flavus,Aspergillosis,Fungus,37.7,12846,12846
+Aspergillus fumigatus,Aspergillosis,Fungus,29.385,19832,19260
+Candida albicans,Yeast,Fungus,14.28,6263,6030
