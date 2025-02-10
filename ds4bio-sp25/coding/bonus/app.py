@@ -162,7 +162,8 @@ def reverse_translation_count(protein, table_id):
     # Get the species-specific codon table
     species_table = CodonTable.unambiguous_dna_by_id[table_id]
     codon_dict = species_table.forward_table
-    # Build a mapping from amino acid to the number of codons that encode it
+
+    # Build a mapping from amino acid -> count of codons that encode it
     aa_to_count = {}
     for codon, aa in codon_dict.items():
         aa_to_count[aa] = aa_to_count.get(aa, 0) + 1
@@ -170,6 +171,7 @@ def reverse_translation_count(protein, table_id):
     # For stop codons, use the stop codons list
     stop_count = len(species_table.stop_codons)
     
+    # Solve the combinatorial problem
     total_options = 1
     for aa in protein:
         if aa == '*':
