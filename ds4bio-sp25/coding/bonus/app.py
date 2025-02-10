@@ -1,7 +1,9 @@
 import streamlit as st
 import requests
+import pandas as pd
 from Bio.Seq import Seq
 from Bio import Entrez, SeqIO
+from Bio.Data import CodonTable
 from io import StringIO
 from urllib.parse import quote  # URL encoding for species search
 
@@ -23,15 +25,20 @@ def get_gene_names(species_name):
         list: Sorted list of gene names.
     """
     try:
+        # Search the ncbi gene database for gene names pertaining to the species but only take the first 30 for brevity
         search_query = f"{species_name}[Organism]"
         handle = Entrez.esearch(db="gene", term=search_query, retmax=30)
         record = Entrez.read(handle)
         handle.close()
         
+        # If we cannot find anything, then just return empty list
         if not record["IdList"]:
             return []
         
+        # otgerwise get the gene ids
         gene_ids = record["IdList"]
+
+        # Then collect all the gene names using the gene ids to query the database
         gene_names = []
         for gene_id in gene_ids:
             summary_handle = Entrez.esummary(db="gene", id=gene_id)
@@ -41,6 +48,8 @@ def get_gene_names(species_name):
                 doc_summary = summary_record["DocumentSummarySet"]["DocumentSummary"]
                 if doc_summary:
                     gene_names.append(doc_summary[0]["Name"])
+
+        # I used a set to prevent duplicates and then sorted the list
         return sorted(set(gene_names))
     except Exception as e:
         st.error(f"Error fetching gene names: {e}")
@@ -102,10 +111,9 @@ def get_mrna_variants(species_name, gene_name):
             fasta_data = fetch_handle.read()
             fetch_handle.close()
             
+            # Here I'm just formatting the Fasta data to 
             fasta_lines = fasta_data.strip().split('\n')
-            # Extract the header (without the '>' character)
             header = fasta_lines[0].strip()[1:]
-            # Concatenate sequence lines and convert T's to U's
             sequence_only = ''.join(fasta_lines[1:]).replace(" ", "").replace("T", "U").replace("t", "u")
             variants[header] = sequence_only
         
@@ -135,14 +143,73 @@ def translate_sequence(mrna_sequence, codon_table_id=1):
         return ""
 
 
+def reverse_translation_count(protein, table_id):
+    """
+    Given a protein sequence and a species-specific codon table ID,
+    return the total number of distinct DNA sequences that could encode the protein.
+    
+    This function uses the species-specific codon dictionary (including stop codons)
+    to compute the product of the number of codons for each amino acid.
+    
+    Args:
+        protein (str): Translated protein sequence.
+        table_id (int): The species-specific codon table ID.
+        
+    Returns:
+        int: Total number of possible DNA sequences.
+    """
+    # Get the species-specific codon table
+    species_table = CodonTable.unambiguous_dna_by_id[table_id]
+    codon_dict = species_table.forward_table
+    # Build a mapping from amino acid to the number of codons that encode it
+    aa_to_count = {}
+    for codon, aa in codon_dict.items():
+        aa_to_count[aa] = aa_to_count.get(aa, 0) + 1
+
+    # For stop codons, use the stop codons list
+    stop_count = len(species_table.stop_codons)
+    
+    total_options = 1
+    for aa in protein:
+        if aa == '*':
+            total_options *= stop_count
+        else:
+            total_options *= aa_to_count.get(aa, 0)
+    return total_options
+
+
+def display_codon_table(table_id):
+    """
+    Display the species-specific codon table as a scrollable DataFrame.
+    
+    Args:
+        table_id (int): The species-specific codon table ID.
+    """
+    species_table = CodonTable.unambiguous_dna_by_id[table_id]
+    codon_mapping = species_table.forward_table
+    stop_codons = species_table.stop_codons
+
+    table_data = []
+    for codon, aa in codon_mapping.items():
+        table_data.append({"Codon": codon, "Amino Acid": aa})
+    for codon in stop_codons:
+        table_data.append({"Codon": codon, "Amino Acid": "*"})
+    
+    df = pd.DataFrame(table_data)
+    df = df.sort_values(by="Codon")
+    
+    st.subheader("Species-Specific Codon Table")
+    st.dataframe(df, height=300)
+
+
 # ----------------------------- #
 #         Streamlit UI          #
 # ----------------------------- #
 
 st.title("Species-Specific Genetic Code Translator 🧬")
-st.write("Fetch mRNA variants from NCBI and choose a variant to translate using the species-specific codon table.")
+st.write("Fetch mRNA variants from NCBI and choose a variant to translate using the species-specific codon table. The codon table is automatically determined based on the species.")
 
-# Let the user choose the input method (only NCBI fetching in this branch)
+# Let the user choose the input method
 input_method = st.radio("Select input method:", ("Fetch from NCBI", "Upload FASTA file"))
 
 if input_method == "Fetch from NCBI":
@@ -184,20 +251,24 @@ if input_method == "Fetch from NCBI":
         st.text_area("Selected mRNA Sequence:", selected_sequence, height=150)
         st.write(f"Sequence Length: {len(selected_sequence)} nucleotides")
         
-        # Retrieve the species-specific codon table (if available)
+        # Retrieve the species-specific codon table ID (non-editable)
         table_id = get_species_codon_table(species_name)
         if table_id is None:
             st.error("Could not determine the genetic code for this species. Defaulting to table ID 1.")
             table_id = 1
-        else:
-            st.write(f"Genetic Code Table ID (from ENA): {table_id}")
-        # Allow user to override the codon table if needed
-        # table_id = st.number_input("Set Codon Table ID (if needed):", min_value=1, max_value=30, value=table_id)
+        st.write(f"Genetic Code Table ID (from ENA): {table_id}")
+        
+        # Display the codon table so the user can see the mapping.
+        display_codon_table(table_id)
         
         if st.button("Translate Selected mRNA"):
             protein = translate_sequence(selected_sequence.upper(), table_id)
             st.subheader("Translated Protein Sequence:")
             st.code(protein, language="text")
+            
+            # Use the species-specific codon table for reverse translation count
+            rev_count = reverse_translation_count(protein, table_id)
+            st.write(f"Total number of distinct DNA sequences that could encode this protein (using the species-specific genetic code): {rev_count:.2e}")
             
 elif input_method == "Upload FASTA file":
     st.subheader("Upload a FASTA File")
@@ -228,9 +299,15 @@ elif input_method == "Upload FASTA file":
             processed_sequence = str(record.seq).replace("T", "U").replace("t", "u")
             st.text_area("Processed mRNA Sequence:", processed_sequence, height=150)
             
-            # Let user set a codon table ID manually (or use default of 1)
-            table_id = st.number_input("Enter Codon Table ID:", min_value=1, max_value=30, value=1)
+            # For uploaded FASTA, default to table ID 1 since species is not specified.
+            table_id = 1
+            st.write(f"Using default Genetic Code Table ID: {table_id}")
+            display_codon_table(table_id)
+            
             if st.button("Translate Uploaded mRNA"):
                 protein = translate_sequence(processed_sequence.upper(), table_id)
                 st.subheader("Translated Protein Sequence:")
                 st.code(protein, language="text")
+                
+                rev_count = reverse_translation_count(protein, table_id)
+                st.write(f"Total number of distinct DNA sequences that could encode this protein (using the genetic code): {rev_count:.2e}")
