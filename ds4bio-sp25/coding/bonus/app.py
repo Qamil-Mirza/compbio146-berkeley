@@ -56,9 +56,9 @@ def get_gene_names(species_name):
         return []
 
 
-def get_species_codon_table(species_name):
+def get_species_codon_table_id(species_name):
     """
-    Retrieve the species-specific mitochondrial codon table from the ENA API.
+    Retrieve the species-specific mitochondrial codon table ID from the ENA API.
     
     Args:
         species_name (str): e.g., "Homo sapiens"
@@ -135,6 +135,7 @@ def translate_sequence(mrna_sequence, codon_table_id=1):
         str: The translated protein sequence.
     """
     try:
+        # Here i convert to a sequence object so I can use the translate method
         mrna_seq = Seq(mrna_sequence)
         protein_seq = mrna_seq.translate(table=codon_table_id)
         return str(protein_seq)
@@ -142,7 +143,7 @@ def translate_sequence(mrna_sequence, codon_table_id=1):
         st.error(f"Error during translation: {e}")
         return ""
 
-
+# NEED SANITY CHECK HERE T_T
 def reverse_translation_count(protein, table_id):
     """
     Given a protein sequence and a species-specific codon table ID,
@@ -207,7 +208,7 @@ def display_codon_table(table_id):
 # ----------------------------- #
 
 st.title("Species-Specific Genetic Code Translator 🧬")
-st.write("Fetch mRNA variants from NCBI and choose a variant to translate using the species-specific codon table. The codon table is automatically determined based on the species.")
+st.write("Fetch mRNA sequences from NCBI or upload a FASTA file to translate to protein sequences. The species-specific codon table is retrieved from NCBI based on the mitochondrial genetic code ID for the species as defined on the ENA api.")
 
 # Let the user choose the input method
 input_method = st.radio("Select input method:", ("Fetch from NCBI", "Upload FASTA file"))
@@ -251,8 +252,8 @@ if input_method == "Fetch from NCBI":
         st.text_area("Selected mRNA Sequence:", selected_sequence, height=150)
         st.write(f"Sequence Length: {len(selected_sequence)} nucleotides")
         
-        # Retrieve the species-specific codon table ID (non-editable)
-        table_id = get_species_codon_table(species_name)
+        # Retrieve the species-specific codon table ID
+        table_id = get_species_codon_table_id(species_name)
         if table_id is None:
             st.error("Could not determine the genetic code for this species. Defaulting to table ID 1.")
             table_id = 1
@@ -270,6 +271,7 @@ if input_method == "Fetch from NCBI":
             rev_count = reverse_translation_count(protein, table_id)
             st.write(f"Total number of distinct DNA sequences that could encode this protein (using the species-specific genetic code): {rev_count:.2e}")
             
+# DIFF UPLOAD METHOD HERE -> USES FASTA FILE INSTEAD OF TEXT INPUT
 elif input_method == "Upload FASTA file":
     st.subheader("Upload a FASTA File")
     uploaded_file = st.file_uploader("Choose a FASTA file", type=["fasta", "fa", "txt"])
