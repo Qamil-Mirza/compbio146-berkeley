@@ -39,12 +39,13 @@ genetic_code_names = {
     30: "Peritrich Nuclear Code",
     31: "Blastocrithidia Nuclear Code",
     32: "Balanophoraceae Plastid Code",
-    33: "Cephalodiscidae Mitochondrial UAA-Tyr Code"
+    33: "Cephalodiscidae Mitochondrial UAA-Tyr Code",
 }
 
 # ----------------------------- #
 #        Helper Functions       #
 # ----------------------------- #
+
 
 def get_gene_names(species_name):
     """
@@ -189,7 +190,6 @@ def translate_sequence(mrna_sequence, codon_table_id=1):
         return ""
 
 
-# NEED SANITY CHECK HERE T_T
 def reverse_translation_count(protein, table_id):
     """
     Given a protein sequence and a species-specific codon table ID,
@@ -284,15 +284,28 @@ def display_codon_table(table_id):
 # ----------------------------- #
 
 st.title("Species-Specific Genetic Code Translator 🧬")
+st.caption("Developed by: Janis Prak, Alyssa Chew, Skye Leng, Abby Huang, Qamil Mirza")
 st.write(
-    "Fetch mRNA sequences from NCBI to translate to protein sequences. The species-specific codon table is retrieved from NCBI based on the mitochondrial genetic code ID for the species as defined on the ENA API."
+    "The species-specific genetic code translator allows you to fetch mRNA sequences from NCBI to translate to protein sequences. The species-specific codon table is retrieved from NCBI based on the mitochondrial genetic code ID for the species as defined on the ENA API."
 )
 
+st.divider()
+
 st.subheader("Fetch mRNA from NCBI")
+st.markdown("Enter a species name and a gene name to fetch mRNA variants. Or, fetch available gene names from NCBI but note homo sapiens gene name fetching is not yet supported in this version!")
+st.markdown("""
+**Some examples** in the form `(species, gene name)`:
+
+1. (Homo sapiens, INS)  
+2. (Mus musculus, Ins2)
+3. (Saccharomyces cerevisiae, CYC1)
+""")
 species_name = st.text_input("Enter a species name:", "Saccharomyces cerevisiae")
 
 # Let the user choose how to provide the gene name.
-gene_input_mode = st.radio("Choose Gene Input Method", ("Enter Manually", "Fetch Available Genes"))
+gene_input_mode = st.radio(
+    "Choose Gene Input Method", ("Enter Manually", "Fetch Available Genes")
+)
 
 if gene_input_mode == "Fetch Available Genes":
     # If the user chooses to fetch genes, let them click a button to fetch them.
@@ -357,20 +370,23 @@ if "variants" in st.session_state and st.session_state.variants:
 if "translated_protein" in st.session_state:
     st.subheader("Translated Protein Sequence:")
     st.code(st.session_state["translated_protein"], language="text")
+    st.markdown("🎉 Voila! You have the translated protein sequence from the selected mRNA sequence.")
     st.divider()
     st.subheader("Reverse Translation Analysis (Bonus Feature)")
-    
+    st.write("While our main focus was only on translating mRNA to protein for any species, we decided to include reverse translation for fun since we had the necessary information to do so! Consider this a bonus feature and have fun with it!")
     rev_count = reverse_translation_count(
         st.session_state["translated_protein"], table_id
     )
 
     st.subheader("Number Of Distinct DNA Sequences")
+    st.markdown("Here, we calculate the total number of distinct DNA sequences that could encode the protein sequence. This calculation is done by multiplying the number of codons that encode each amino acid.")
     st.text_area(
-        "Total",
-        rev_count,
+        "Total Number of Distinct DNA Sequences:",
+        str(rev_count),
         height=150,
     )
     st.subheader("Reverse Translation With Another Species Codon Table")
+    st.write("In this section, you can reverse translate the protein sequence to an mRNA sequence using the codon table of another species.")
     target_species = st.text_input("Enter a target species name:", "Mus musculus")
     if st.button("Reverse Translate Protein", key="reverse_translate_fetch"):
         target_species_table_id = get_species_codon_table_id(target_species)
@@ -393,3 +409,20 @@ if "translated_protein" in st.session_state:
             reverse_mrna,
             height=150,
         )
+
+# ----------------------------- #
+#         Acknowledgements      #
+# ----------------------------- #
+st.divider()
+st.subheader("Data Sources & Acknowledgements")
+st.markdown("""  
+- **NCBI Gene and Nucleotide Databases**:  
+  This app uses data retrieved via the NCBI Entrez API. See [NCBI's website](https://www.ncbi.nlm.nih.gov/) 
+  and [Entrez Programming Utilities (E-utilities)](https://www.ncbi.nlm.nih.gov/books/NBK25501/) 
+  for more information and usage policies.
+
+- **EBI ENA API**:  
+  Mitochondrial genetic code information is fetched from the [European Nucleotide Archive (ENA)](https://www.ebi.ac.uk/ena/browser/home) 
+  via their Taxonomy REST API. Please refer to the [ENA documentation](https://www.ebi.ac.uk/ena/portal/api/) 
+  for further details and terms of use.
+""")
