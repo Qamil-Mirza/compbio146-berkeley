@@ -285,25 +285,29 @@ def display_codon_table(table_id):
 
 st.title("Species-Specific Genetic Code Translator 🧬")
 st.write(
-    "Fetch mRNA sequences from NCBI to translate to protein sequences. The species-specific codon table is retrieved from NCBI based on the mitochondrial genetic code ID for the species as defined on the ENA api."
+    "Fetch mRNA sequences from NCBI to translate to protein sequences. The species-specific codon table is retrieved from NCBI based on the mitochondrial genetic code ID for the species as defined on the ENA API."
 )
 
 st.subheader("Fetch mRNA from NCBI")
 species_name = st.text_input("Enter a species name:", "Saccharomyces cerevisiae")
 
-# Persist gene names in session state
-if "gene_names" not in st.session_state:
+# Let the user choose how to provide the gene name.
+gene_input_mode = st.radio("Choose Gene Input Method", ("Enter Manually", "Fetch Available Genes"))
+
+if gene_input_mode == "Fetch Available Genes":
+    # If the user chooses to fetch genes, let them click a button to fetch them.
+    if st.button("Fetch Available Genes"):
+        st.session_state.gene_names = get_gene_names(species_name)
+        if not st.session_state.gene_names:
+            st.error("No genes found for this species. Try another one.")
+    # If gene names are available, display a selectbox.
+    if "gene_names" in st.session_state and st.session_state.gene_names:
+        gene_name = st.selectbox("Select a Gene:", st.session_state.gene_names)
+    else:
+        gene_name = ""  # No gene selected yet.
+elif gene_input_mode == "Enter Manually":
+    # When manual entry is selected, clear any previously fetched gene names.
     st.session_state.gene_names = []
-
-if st.button("Fetch Available Genes"):
-    st.session_state.gene_names = get_gene_names(species_name)
-    if not st.session_state.gene_names:
-        st.error("No genes found for this species. Try another one.")
-
-# If gene names are available, show a selectbox; otherwise allow manual entry
-if st.session_state.gene_names:
-    gene_name = st.selectbox("Select a Gene:", st.session_state.gene_names)
-else:
     gene_name = st.text_input("Enter a gene name manually:")
 
 if st.button("Fetch mRNA Variants"):
@@ -318,6 +322,7 @@ if st.button("Fetch mRNA Variants"):
             )
         else:
             st.error("No mRNA variants retrieved. Try another gene name.")
+
 
 # If variants are fetched, let the user choose one for translation
 if "variants" in st.session_state and st.session_state.variants:
@@ -358,8 +363,12 @@ if "translated_protein" in st.session_state:
     rev_count = reverse_translation_count(
         st.session_state["translated_protein"], table_id
     )
-    st.write(
-        f"Total number of distinct DNA sequences that could encode this protein (using the species-specific genetic code): {rev_count:.2e}"
+
+    st.subheader("Number Of Distinct DNA Sequences")
+    st.text_area(
+        "Total",
+        rev_count,
+        height=50,
     )
     st.subheader("Reverse Translation With Another Species Codon Table")
     target_species = st.text_input("Enter a target species name:", "Mus musculus")
