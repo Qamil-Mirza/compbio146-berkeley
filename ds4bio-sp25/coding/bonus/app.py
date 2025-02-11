@@ -368,7 +368,7 @@ if "translated_protein" in st.session_state:
     st.text_area(
         "Total",
         rev_count,
-        height=50,
+        height=150,
     )
     st.subheader("Reverse Translation With Another Species Codon Table")
     target_species = st.text_input("Enter a target species name:", "Mus musculus")
