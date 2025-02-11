@@ -11,10 +11,40 @@ import random
 # Set the email for API access to the NCBI Database
 Entrez.email = "qamilmirza@berkeley.edu"
 
+# Global variables
+genetic_code_names = {
+    1: "Standard Genetic Code",
+    2: "Vertebrate Mitochondrial Code",
+    3: "Yeast Mitochondrial Code",
+    4: "Mold, Protozoan, and Coelenterate Mitochondrial Code and Mycoplasma/Spiroplasma Code",
+    5: "Invertebrate Mitochondrial Code",
+    6: "Ciliate, Dasycladacean, and Hexamita Nuclear Code",
+    9: "Echinoderm and Flatworm Mitochondrial Code",
+    10: "Euplotid Nuclear Code",
+    11: "Bacterial, Archaeal, and Plant Plastid Code",
+    12: "Alternative Yeast Nuclear Code",
+    13: "Ascidian Mitochondrial Code",
+    14: "Alternative Flatworm Mitochondrial Code",
+    15: "Blepharisma Nuclear Code",
+    16: "Chlorophycean Mitochondrial Code",
+    21: "Trematode Mitochondrial Code",
+    22: "Scenedesmus obliquus Mitochondrial Code",
+    23: "Thraustochytrium Mitochondrial Code",
+    24: "Rhabdopleuridae Mitochondrial Code",
+    25: "Candidatus Division SR1 and Gracilibacteria Code",
+    26: "Pachysolen tannophilus Nuclear Code",
+    27: "Karyorelict Nuclear Code",
+    28: "Condylostoma Nuclear Code",
+    29: "Mesodinium Nuclear Code",
+    30: "Peritrich Nuclear Code",
+    31: "Blastocrithidia Nuclear Code",
+    32: "Balanophoraceae Plastid Code",
+    33: "Cephalodiscidae Mitochondrial UAA-Tyr Code"
+}
+
 # ----------------------------- #
 #        Helper Functions       #
 # ----------------------------- #
-
 
 def get_gene_names(species_name):
     """
@@ -245,7 +275,7 @@ def display_codon_table(table_id):
     df = pd.DataFrame(table_data)
     df = df.sort_values(by="Codon")
 
-    st.subheader("Species-Specific Codon Table")
+    st.subheader(f"{genetic_code_names[table_id]} Codon Table")
     st.dataframe(df, height=300)
 
 
@@ -307,7 +337,9 @@ if "variants" in st.session_state and st.session_state.variants:
             "Could not determine the genetic code for this species. Defaulting to table ID 1."
         )
         table_id = 1
-    st.write(f"Genetic Code Table ID (from ENA): {table_id}")
+
+    code_name = genetic_code_names.get(table_id, "Unknown")
+    st.write(f"Genetic Code Table ID: {table_id} - {code_name}")
 
     # Display the codon table so the user can see the mapping.
     display_codon_table(table_id)
@@ -322,9 +354,6 @@ if "translated_protein" in st.session_state:
     st.code(st.session_state["translated_protein"], language="text")
     st.divider()
     st.subheader("Reverse Translation Analysis (Bonus Feature)")
-    st.write(
-        "While the focus of this project was not on reverse translation, we collectively decided to include this feature as a bonus. Reverse translation is the process of converting a protein sequence back to a DNA sequence. This is a complex problem because multiple codons can encode the same amino acid. As a result, the number of possible DNA sequences that could encode a given protein sequence is often very large."
-    )
     
     rev_count = reverse_translation_count(
         st.session_state["translated_protein"], table_id
@@ -342,6 +371,11 @@ if "translated_protein" in st.session_state:
             )
             target_species_table_id = 1
 
+        target_code_name = genetic_code_names.get(target_species_table_id, "Unknown")
+        st.write(
+            f"Genetic Code Table ID for {target_species}: {target_species_table_id} - {target_code_name}"
+        )
+        display_codon_table(target_species_table_id)
         reverse_mrna = reverse_translate_random(
             st.session_state["translated_protein"], target_species_table_id
         )
