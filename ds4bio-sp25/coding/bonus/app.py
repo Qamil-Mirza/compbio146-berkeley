@@ -6,6 +6,7 @@ from Bio import Entrez, SeqIO
 from Bio.Data import CodonTable
 from io import StringIO
 from urllib.parse import quote  # URL encoding for species search
+import random
 
 # Set the email for API access to the NCBI Database
 Entrez.email = "qamilmirza@berkeley.edu"
@@ -14,13 +15,14 @@ Entrez.email = "qamilmirza@berkeley.edu"
 #        Helper Functions       #
 # ----------------------------- #
 
+
 def get_gene_names(species_name):
     """
     Fetch gene names for a species from NCBI.
-    
+
     Args:
         species_name (str): e.g., "Homo sapiens"
-        
+
     Returns:
         list: Sorted list of gene names.
     """
@@ -30,11 +32,11 @@ def get_gene_names(species_name):
         handle = Entrez.esearch(db="gene", term=search_query, retmax=30)
         record = Entrez.read(handle)
         handle.close()
-        
+
         # If we cannot find anything, then just return empty list
         if not record["IdList"]:
             return []
-        
+
         # otgerwise get the gene ids
         gene_ids = record["IdList"]
 
@@ -59,15 +61,17 @@ def get_gene_names(species_name):
 def get_species_codon_table_id(species_name):
     """
     Retrieve the species-specific mitochondrial codon table ID from the ENA API.
-    
+
     Args:
         species_name (str): e.g., "Homo sapiens"
-        
+
     Returns:
         int: Codon table ID (default is 1 if not found)
     """
     encoded_species = quote(species_name)
-    search_url = f"https://www.ebi.ac.uk/ena/taxonomy/rest/scientific-name/{encoded_species}"
+    search_url = (
+        f"https://www.ebi.ac.uk/ena/taxonomy/rest/scientific-name/{encoded_species}"
+    )
     try:
         response = requests.get(search_url)
         response.raise_for_status()
@@ -86,37 +90,48 @@ def get_species_codon_table_id(species_name):
 def get_mrna_variants(species_name, gene_name):
     """
     Fetch all available mRNA variants from NCBI for a given species and gene.
-    
+
     Args:
         species_name (str): e.g., "Homo sapiens"
         gene_name (str): e.g., "INS"
-        
+
     Returns:
         dict: Dictionary mapping FASTA header (variant description) to processed mRNA sequence.
     """
     try:
         # Use a generic mRNA filter
-        search_query = f"{species_name}[Organism] AND {gene_name}[Gene] AND mRNA[Filter]"
+        search_query = (
+            f"{species_name}[Organism] AND {gene_name}[Gene] AND mRNA[Filter]"
+        )
         handle = Entrez.esearch(db="nucleotide", term=search_query, retmax=20)
         record = Entrez.read(handle)
         handle.close()
-        
+
         if not record["IdList"]:
             return {}
-        
+
         gene_ids = record["IdList"]
-        variants = {}  # key: header (variant description), value: sequence (with T's replaced by U's)
+        variants = (
+            {}
+        )  # key: header (variant description), value: sequence (with T's replaced by U's)
         for gene_id in gene_ids:
-            fetch_handle = Entrez.efetch(db="nucleotide", id=gene_id, rettype="fasta", retmode="text")
+            fetch_handle = Entrez.efetch(
+                db="nucleotide", id=gene_id, rettype="fasta", retmode="text"
+            )
             fasta_data = fetch_handle.read()
             fetch_handle.close()
-            
-            # Here I'm just formatting the Fasta data to 
-            fasta_lines = fasta_data.strip().split('\n')
+
+            # Here I'm just formatting the Fasta data to
+            fasta_lines = fasta_data.strip().split("\n")
             header = fasta_lines[0].strip()[1:]
-            sequence_only = ''.join(fasta_lines[1:]).replace(" ", "").replace("T", "U").replace("t", "u")
+            sequence_only = (
+                "".join(fasta_lines[1:])
+                .replace(" ", "")
+                .replace("T", "U")
+                .replace("t", "u")
+            )
             variants[header] = sequence_only
-        
+
         return variants
     except Exception as e:
         st.error(f"Error fetching mRNA variants: {e}")
@@ -126,11 +141,11 @@ def get_mrna_variants(species_name, gene_name):
 def translate_sequence(mrna_sequence, codon_table_id=1):
     """
     Translate an mRNA sequence into a protein sequence using the specified codon table.
-    
+
     Args:
         mrna_sequence (str): The mRNA sequence.
         codon_table_id (int): Genetic code table ID.
-        
+
     Returns:
         str: The translated protein sequence.
     """
@@ -143,19 +158,20 @@ def translate_sequence(mrna_sequence, codon_table_id=1):
         st.error(f"Error during translation: {e}")
         return ""
 
+
 # NEED SANITY CHECK HERE T_T
 def reverse_translation_count(protein, table_id):
     """
     Given a protein sequence and a species-specific codon table ID,
     return the total number of distinct DNA sequences that could encode the protein.
-    
+
     This function uses the species-specific codon dictionary (including stop codons)
     to compute the product of the number of codons for each amino acid.
-    
+
     Args:
         protein (str): Translated protein sequence.
         table_id (int): The species-specific codon table ID.
-        
+
     Returns:
         int: Total number of possible DNA sequences.
     """
@@ -170,21 +186,49 @@ def reverse_translation_count(protein, table_id):
 
     # For stop codons, use the stop codons list
     stop_count = len(species_table.stop_codons)
-    
+
     # Solve the combinatorial problem
     total_options = 1
     for aa in protein:
-        if aa == '*':
+        if aa == "*":
             total_options *= stop_count
         else:
             total_options *= aa_to_count.get(aa, 0)
     return total_options
 
 
+def reverse_translate_random(protein, target_table_id):
+    """
+    Given a protein sequence and a target species codon table ID,
+    return an mRNA sequence where each amino acid is encoded by
+    a randomly chosen codon from the target species codon table.
+
+    Args:
+        protein (str): Translated protein sequence.
+        target_table_id (int): Codon table ID for the target species.
+
+    Returns:
+        str: mRNA sequence (with U's) reverse-translated using target species codons.
+    """
+    target_table = CodonTable.unambiguous_dna_by_id[target_table_id]
+    aa_to_codons = {}
+    for codon, aa in target_table.forward_table.items():
+        aa_to_codons.setdefault(aa, []).append(codon)
+    aa_to_codons["*"] = target_table.stop_codons
+
+    mrna_seq = ""
+    for aa in protein:
+        if aa not in aa_to_codons:
+            raise ValueError(f"Invalid amino acid in protein sequence: {aa}")
+        mrna_seq += random.choice(aa_to_codons[aa])
+    # Convert DNA codons (with T's) to mRNA codons (with U's)
+    return mrna_seq.replace("T", "U")
+
+
 def display_codon_table(table_id):
     """
     Display the species-specific codon table as a scrollable DataFrame.
-    
+
     Args:
         table_id (int): The species-specific codon table ID.
     """
@@ -197,10 +241,10 @@ def display_codon_table(table_id):
         table_data.append({"Codon": codon, "Amino Acid": aa})
     for codon in stop_codons:
         table_data.append({"Codon": codon, "Amino Acid": "*"})
-    
+
     df = pd.DataFrame(table_data)
     df = df.sort_values(by="Codon")
-    
+
     st.subheader("Species-Specific Codon Table")
     st.dataframe(df, height=300)
 
@@ -210,108 +254,99 @@ def display_codon_table(table_id):
 # ----------------------------- #
 
 st.title("Species-Specific Genetic Code Translator 🧬")
-st.write("Fetch mRNA sequences from NCBI or upload a FASTA file to translate to protein sequences. The species-specific codon table is retrieved from NCBI based on the mitochondrial genetic code ID for the species as defined on the ENA api.")
+st.write(
+    "Fetch mRNA sequences from NCBI to translate to protein sequences. The species-specific codon table is retrieved from NCBI based on the mitochondrial genetic code ID for the species as defined on the ENA api."
+)
 
-# Let the user choose the input method
-input_method = st.radio("Select input method:", ("Fetch from NCBI", "Upload FASTA file"))
+st.subheader("Fetch mRNA from NCBI")
+species_name = st.text_input("Enter a species name:", "Saccharomyces cerevisiae")
 
-if input_method == "Fetch from NCBI":
-    st.subheader("Fetch mRNA from NCBI")
-    species_name = st.text_input("Enter a species name:", "Homo sapiens")
-    
-    # Persist gene names in session state
-    if "gene_names" not in st.session_state:
-        st.session_state.gene_names = []
-    
-    if st.button("Fetch Available Genes"):
-        st.session_state.gene_names = get_gene_names(species_name)
-        if not st.session_state.gene_names:
-            st.error("No genes found for this species. Try another one.")
-    
-    # If gene names are available, show a selectbox; otherwise allow manual entry
-    if st.session_state.gene_names:
-        gene_name = st.selectbox("Select a Gene:", st.session_state.gene_names)
+# Persist gene names in session state
+if "gene_names" not in st.session_state:
+    st.session_state.gene_names = []
+
+if st.button("Fetch Available Genes"):
+    st.session_state.gene_names = get_gene_names(species_name)
+    if not st.session_state.gene_names:
+        st.error("No genes found for this species. Try another one.")
+
+# If gene names are available, show a selectbox; otherwise allow manual entry
+if st.session_state.gene_names:
+    gene_name = st.selectbox("Select a Gene:", st.session_state.gene_names)
+else:
+    gene_name = st.text_input("Enter a gene name manually:")
+
+if st.button("Fetch mRNA Variants"):
+    if not species_name or not gene_name:
+        st.error("Please enter/select both a species name and a gene name.")
     else:
-        gene_name = st.text_input("Enter a gene name manually:")
-    
-    if st.button("Fetch mRNA Variants"):
-        if not species_name or not gene_name:
-            st.error("Please enter/select both a species name and a gene name.")
+        variants = get_mrna_variants(species_name, gene_name)
+        if variants:
+            st.session_state.variants = variants
+            st.success(
+                f"Retrieved {len(variants)} mRNA variant(s) for {gene_name} in {species_name}."
+            )
         else:
-            variants = get_mrna_variants(species_name, gene_name)
-            if variants:
-                st.session_state.variants = variants
-                st.success(f"Retrieved {len(variants)} mRNA variant(s) for {gene_name} in {species_name}.")
-            else:
-                st.error("No mRNA variants retrieved. Try another gene name.")
+            st.error("No mRNA variants retrieved. Try another gene name.")
+
+# If variants are fetched, let the user choose one for translation
+if "variants" in st.session_state and st.session_state.variants:
+    variant_keys = list(st.session_state.variants.keys())
+    selected_variant = st.selectbox(
+        "Select an mRNA variant to translate:", variant_keys
+    )
+    selected_sequence = st.session_state.variants[selected_variant]
+
+    st.text_area("Selected mRNA Sequence:", selected_sequence, height=150)
+    st.write(f"Sequence Length: {len(selected_sequence)} nucleotides")
+
+    # Retrieve the species-specific codon table ID
+    table_id = get_species_codon_table_id(species_name)
+    if table_id is None:
+        st.error(
+            "Could not determine the genetic code for this species. Defaulting to table ID 1."
+        )
+        table_id = 1
+    st.write(f"Genetic Code Table ID (from ENA): {table_id}")
+
+    # Display the codon table so the user can see the mapping.
+    display_codon_table(table_id)
+
+    if st.button("Translate Selected mRNA"):
+        protein = translate_sequence(selected_sequence.upper(), table_id)
+        st.session_state["translated_protein"] = protein
+
+
+if "translated_protein" in st.session_state:
+    st.subheader("Translated Protein Sequence:")
+    st.code(st.session_state["translated_protein"], language="text")
+    st.divider()
+    st.subheader("Reverse Translation Analysis (Bonus Feature)")
+    st.write(
+        "While the focus of this project was not on reverse translation, we collectively decided to include this feature as a bonus. Reverse translation is the process of converting a protein sequence back to a DNA sequence. This is a complex problem because multiple codons can encode the same amino acid. As a result, the number of possible DNA sequences that could encode a given protein sequence is often very large."
+    )
     
-    # If variants are fetched, let the user choose one for translation
-    if "variants" in st.session_state and st.session_state.variants:
-        variant_keys = list(st.session_state.variants.keys())
-        selected_variant = st.selectbox("Select an mRNA variant to translate:", variant_keys)
-        selected_sequence = st.session_state.variants[selected_variant]
-        
-        st.text_area("Selected mRNA Sequence:", selected_sequence, height=150)
-        st.write(f"Sequence Length: {len(selected_sequence)} nucleotides")
-        
-        # Retrieve the species-specific codon table ID
-        table_id = get_species_codon_table_id(species_name)
-        if table_id is None:
-            st.error("Could not determine the genetic code for this species. Defaulting to table ID 1.")
-            table_id = 1
-        st.write(f"Genetic Code Table ID (from ENA): {table_id}")
-        
-        # Display the codon table so the user can see the mapping.
-        display_codon_table(table_id)
-        
-        if st.button("Translate Selected mRNA"):
-            protein = translate_sequence(selected_sequence.upper(), table_id)
-            st.subheader("Translated Protein Sequence:")
-            st.code(protein, language="text")
-            
-            # Use the species-specific codon table for reverse translation count
-            rev_count = reverse_translation_count(protein, table_id)
-            st.write(f"Total number of distinct DNA sequences that could encode this protein (using the species-specific genetic code): {rev_count:.2e}")
-            
-# DIFF UPLOAD METHOD HERE -> USES FASTA FILE INSTEAD OF TEXT INPUT
-elif input_method == "Upload FASTA file":
-    st.subheader("Upload a FASTA File")
-    uploaded_file = st.file_uploader("Choose a FASTA file", type=["fasta", "fa", "txt"])
-    
-    if uploaded_file is not None:
-        file_content = uploaded_file.read().decode("utf-8")
-        st.text_area("Uploaded FASTA File Content:", file_content, height=150)
-        # Parse the FASTA content
-        fasta_io = StringIO(file_content)
-        records = list(SeqIO.parse(fasta_io, "fasta"))
-        
-        if not records:
-            st.error("No FASTA records found in the file.")
-        else:
-            # If multiple records exist, let the user select one
-            if len(records) > 1:
-                record_ids = [record.id for record in records]
-                selected_id = st.selectbox("Select a FASTA record to translate", record_ids)
-                record = next((rec for rec in records if rec.id == selected_id), records[0])
-            else:
-                record = records[0]
-            
-            st.write(f"Selected Record: **{record.id}**")
-            st.write(f"Sequence Length: {len(record.seq)} nucleotides")
-            
-            # Process sequence: replace T's with U's if needed (assume DNA input)
-            processed_sequence = str(record.seq).replace("T", "U").replace("t", "u")
-            st.text_area("Processed mRNA Sequence:", processed_sequence, height=150)
-            
-            # For uploaded FASTA, default to table ID 1 since species is not specified.
-            table_id = 1
-            st.write(f"Using default Genetic Code Table ID: {table_id}")
-            display_codon_table(table_id)
-            
-            if st.button("Translate Uploaded mRNA"):
-                protein = translate_sequence(processed_sequence.upper(), table_id)
-                st.subheader("Translated Protein Sequence:")
-                st.code(protein, language="text")
-                
-                rev_count = reverse_translation_count(protein, table_id)
-                st.write(f"Total number of distinct DNA sequences that could encode this protein (using the genetic code): {rev_count:.2e}")
+    rev_count = reverse_translation_count(
+        st.session_state["translated_protein"], table_id
+    )
+    st.write(
+        f"Total number of distinct DNA sequences that could encode this protein (using the species-specific genetic code): {rev_count:.2e}"
+    )
+    st.subheader("Reverse Translation With Another Species Codon Table")
+    target_species = st.text_input("Enter a target species name:", "Mus musculus")
+    if st.button("Reverse Translate Protein", key="reverse_translate_fetch"):
+        target_species_table_id = get_species_codon_table_id(target_species)
+        if target_species_table_id is None:
+            st.error(
+                "Could not determine the genetic code for the target species. Defaulting to table ID 1."
+            )
+            target_species_table_id = 1
+
+        reverse_mrna = reverse_translate_random(
+            st.session_state["translated_protein"], target_species_table_id
+        )
+        st.text_area(
+            f"Reverse-Translated mRNA Sequence to {target_species}:",
+            reverse_mrna,
+            height=150,
+        )
