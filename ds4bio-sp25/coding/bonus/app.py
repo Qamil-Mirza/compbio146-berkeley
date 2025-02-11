@@ -283,6 +283,12 @@ def display_codon_table(table_id):
 #         Streamlit UI          #
 # ----------------------------- #
 
+# Page setup
+st.set_page_config(
+    page_title="Species-specific Genetic Code Translator",
+    page_icon="🧬"
+)
+
 st.title("Species-Specific Genetic Code Translator 🧬")
 st.caption("Developed by: Janis Prak, Alyssa Chew, Skye Leng, Abby Huang, Qamil Mirza")
 st.write(
