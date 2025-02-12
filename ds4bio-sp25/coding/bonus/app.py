@@ -290,7 +290,7 @@ st.set_page_config(
 )
 
 st.title("Species-Specific Genetic Code Translator 🧬")
-st.caption("Developed by: Janis Prak, Alyssa Chew, Skye Leng, Abby Huang, Qamil Mirza")
+st.caption("Developed by: Janis Prak, Alyssa Chew, Skye Leng, Jiayi Huang, Qamil Mirza")
 st.write(
     "The species-specific genetic code translator allows you to fetch mRNA sequences from NCBI to translate to protein sequences. The species-specific codon table is retrieved from NCBI based on the mitochondrial genetic code ID for the species as defined on the ENA API."
 )
