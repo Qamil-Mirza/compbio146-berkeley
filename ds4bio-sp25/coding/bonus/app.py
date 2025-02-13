@@ -2,14 +2,11 @@ import streamlit as st
 import requests
 import pandas as pd
 from Bio.Seq import Seq
-from Bio import Entrez, SeqIO
+from Bio import Entrez
 from Bio.Data import CodonTable
-from io import StringIO
 from urllib.parse import quote  # URL encoding for species search
 import random
-
-# Set the email for API access to the NCBI Database
-Entrez.email = "qamilmirza@berkeley.edu"
+import re
 
 # Global variables
 genetic_code_names = {
@@ -278,6 +275,11 @@ def display_codon_table(table_id):
     st.subheader(f"{genetic_code_names[table_id]} Codon Table")
     st.dataframe(df, height=300)
 
+def is_valid_email(email):
+    """Return True if the email is valid, False otherwise."""
+    pattern = r"^[^@]+@[^@]+\.[^@]+$"
+    return re.match(pattern, email) is not None
+
 
 # ----------------------------- #
 #         Streamlit UI          #
@@ -294,6 +296,21 @@ st.caption("Developed by: Janis Prak, Alyssa Chew, Skye Leng, Jiayi Huang, Qamil
 st.write(
     "The species-specific genetic code translator allows you to fetch mRNA sequences from NCBI to translate to protein sequences. The species-specific codon table is retrieved from NCBI based on the mitochondrial genetic code ID for the species as defined on the ENA API."
 )
+
+st.markdown("To get started, please enter your email address below for NCBI API access. If you don't have a registered email address, you can easily register with the NCBI to get one [here](https://www.ncbi.nlm.nih.gov/account/register/) for free.")
+
+user_email = st.text_input(
+    "Enter your email address for NCBI API access",
+    "your.email@example.com"
+)
+if user_email:
+    if is_valid_email(user_email):
+        Entrez.email = user_email
+    else:
+        st.error("Please enter a valid email address.")
+else:
+    st.error("Please provide your email for API access to NCBI.")
+
 
 st.divider()
 
